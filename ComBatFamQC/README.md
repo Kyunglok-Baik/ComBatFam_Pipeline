@@ -35,7 +35,7 @@ The ComBatFamQC package offers the following four key functionalities:
 ```{r}
 library(devtools)
 
-devtools::install_github("Zheng206/ComBatFam_Pipeline/ComBatFamQC", build_vignettes = TRUE)
+devtools::install_github("Kyunglok-Baik/ComBatFam_Pipeline/ComBatFamQC", build_vignettes = TRUE)
 
 ```
 
