@@ -82,8 +82,8 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   df[[batch]] = as.factor(df[[batch]])
   char_var = covariates[sapply(df[covariates], function(col) is.character(col) || is.factor(col))]
   enco_var = covariates[sapply(df[covariates], function(col) length(unique(col)) == 2 && all(unique(col) %in% c(0,1)))]
-  df[char_var] =  lapply(df[char_var], as.factor)
-  df[enco_var] =  lapply(df[enco_var], as.factor)
+  df[char_var] =  mclapply(df[char_var], as.factor)
+  df[enco_var] =  mclapply(df[enco_var], as.factor)
   cov_shiny = covariates
   char_var = c(char_var, enco_var)
   if(!is.null(random)){
@@ -102,10 +102,10 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
       if(smooth_int_type == "linear"){
         interaction = gsub(",", ":", interaction)
       }else if(smooth_int_type == "categorical-continuous"){
-        element = lapply(interaction, function(x) str_split(x,",")[[1]])
-        smooth_element = lapply(element, function(x) x[which(x %in% smooth)])
-        categorical_element = lapply(1:length(element), function(i) setdiff(element[[i]], smooth_element[[i]]))
-        interaction = lapply(1:length(element), function(i) {
+        element = mclapply(interaction, function(x) str_split(x,",")[[1]])
+        smooth_element = mclapply(element, function(x) x[which(x %in% smooth)])
+        categorical_element = mclapply(1:length(element), function(i) setdiff(element[[i]], smooth_element[[i]]))
+        interaction = mclapply(1:length(element), function(i) {
           if(length(smooth_element[[i]]) == 0){paste0(element[[i]], collapse = ":")}else{
           paste0("s(", smooth_element[[i]], ", by = ", categorical_element[[i]], ")")}
           }) %>% unlist()
@@ -150,11 +150,11 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
  
    # Residual Plots
   vis_df = df[colnames(df)[!colnames(df) %in% features]]
-  residual_add_df = lapply(features, function(y){
+  residual_add_df = mclapply(features, function(y){
     model = model_gen(y = y, type = type, batch = batch, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
     if(type == "lmer"){
       coef_list = coef(model)
-      intercept = lapply(1:length(coef_list), function(i){
+      intercept = mclapply(1:length(coef_list), function(i){
         b = coef_list[[i]]
         b_fix = unique(b[,-1])
         b_fix_ex = b_fix[which(!grepl(paste0(batch,"*"), names(b_fix)))]
@@ -185,10 +185,10 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
     residual = data.frame(df[[y]] - y_hat)
     colnames(residual) = y
     return(residual)
-  }, mc.cores = detectCores()) %>% bind_cols()
+  }, mc.cores = 1) %>% bind_cols()
   residual_add_df = cbind(vis_df, residual_add_df)
   
-  residual_ml_df = lapply(features, function(y){
+  residual_ml_df = mclapply(features, function(y){
     model = model_gen(type = type, y = y, batch = batch, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
     residual = data.frame(resid(model))
     colnames(residual) = y
@@ -208,13 +208,13 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   
   ## Kenward-Roger(KR) Test
   if(type == "lmer"){
-    kr_test_df = lapply(features, function(y){
+    kr_test_df = mclapply(features, function(y){
       lmm1 = model_gen(type = type, y = y, batch = batch, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
       lmm2 = update(lmm1, as.formula(paste0(".~. -", batch)))
       kr.test = KRmodcomp(lmm1, lmm2)
       kr_df = kr.test %>% tidy() %>% filter(type == "Ftest") %>% mutate(feature = y) %>% dplyr::select(feature, stat, ndf, ddf, p.value) 
       return(kr_df)
-    }, mc.cores = detectCores()) %>% bind_rows()
+    }, mc.cores = 1) %>% bind_rows()
     kr_test_df$p.value = p.adjust(kr_test_df$p.value, method = "bonferroni", n = length(kr_test_df$p.value))
     kr_test_df = kr_test_df %>% arrange(p.value) %>% mutate(sig = case_when(p.value < 0.05 & p.value >= 0.01 ~ "*",
                                                        p.value < 0.01 & p.value >= 0.001 ~ "**",
@@ -232,14 +232,14 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   }
   
   ## Fligner-Killeen(FK) Test
-  fk_test_df = lapply(features, function(y){
+  fk_test_df = mclapply(features, function(y){
     lmm_multi = model_gen(type = type, y = y, batch = batch, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
     fit_residuals <- resid(lmm_multi)
     FKtest = fligner.test(fit_residuals ~ df[[batch]])
     fk_df = FKtest %>% tidy() %>% dplyr::select(p.value) %>% mutate(feature = y)
     fk_df = fk_df[c(2,1)]
     return(fk_df)
-  }, mc.cores = detectCores()) %>% bind_rows()
+  }, mc.cores = 1) %>% bind_rows()
   fk_test_df$p.value = p.adjust(fk_test_df$p.value, method = "bonferroni", n = length(fk_test_df$p.value))
   fk_test_df = fk_test_df %>% arrange(p.value) %>% mutate(sig = case_when(p.value < 0.05 & p.value >= 0.01 ~ "*",
                                                      p.value < 0.01 & p.value >= 0.001 ~ "**",
@@ -267,7 +267,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   
   
   ## ANOVA 
-  anova_test_df = lapply(features, function(y){
+  anova_test_df = mclapply(features, function(y){
     lmm1 = model_gen(type = type, y = y, batch = batch, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
     lmm2 = update(lmm1, as.formula(paste0(".~. - ", batch)))
     if(type == "gam"){
@@ -281,7 +281,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
     anova_df = data.frame(cbind(y, p[length(p)]))
     colnames(anova_df) = c("feature", "p.value")
     return(anova_df)
-  }, mc.cores = detectCores()) %>% bind_rows()
+  }, mc.cores = 1) %>% bind_rows()
   anova_test_df$p.value = p.adjust(anova_test_df$p.value, method = "bonferroni", n = length(anova_test_df$p.value))
   anova_test_df = anova_test_df %>% arrange(p.value) %>% mutate(sig = case_when(p.value < 0.05 & p.value >= 0.01 ~ "*",
                                                            p.value < 0.01 & p.value >= 0.001 ~ "**",
@@ -293,12 +293,12 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   unique_anova = unique(anova_test_df$p.value)[unique(anova_test_df$p.value) != "<0.001"][which(as.numeric(unique(anova_test_df$p.value)[unique(anova_test_df$p.value) != "<0.001"]) < 0.05)]
   
   ## Kruskal-Wallis 
-  kw_test_df = lapply(features, function(y){
+  kw_test_df = mclapply(features, function(y){
     KWtest = kruskal.test(residual_add_df[[y]] ~ residual_add_df[[batch]])
     kw_df = KWtest %>% tidy() %>% dplyr::select(p.value) %>% mutate(feature = y) 
     kw_df = kw_df[c(2,1)]
     return(kw_df)
-  }, mc.cores = detectCores()) %>% bind_rows()
+  }, mc.cores = 1) %>% bind_rows()
   kw_test_df$p.value = p.adjust(kw_test_df$p.value, method = "bonferroni", n = length(kw_test_df$p.value))
   kw_test_df = kw_test_df %>% arrange(p.value) %>% mutate(sig = case_when(p.value < 0.05 & p.value >= 0.01 ~ "*",
                                                                           p.value < 0.01 & p.value >= 0.001 ~ "**",
@@ -310,14 +310,14 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   unique_kw = unique(kw_test_df$p.value)[unique(kw_test_df$p.value) != "<0.001"][which(as.numeric(unique(kw_test_df$p.value)[unique(kw_test_df$p.value) != "<0.001"]) < 0.05)]
   
   ## Levene's Test
-  lv_test_df = lapply(features, function(y){
+  lv_test_df = mclapply(features, function(y){
     lmm_multi = model_gen(type = type, y = y, batch = batch, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
     fit_residuals = resid(lmm_multi)
     LVtest = leveneTest(fit_residuals ~ as.factor(df[[batch]]))
     lv_df = LVtest %>% tidy() %>% dplyr::select(p.value) %>% mutate(feature = y) 
     lv_df = lv_df[c(2,1)]
     return(lv_df)
-  }, mc.cores = detectCores()) %>% bind_rows()
+  }, mc.cores = 1) %>% bind_rows()
   lv_test_df$p.value = p.adjust(lv_test_df$p.value, method = "bonferroni", n = length(lv_test_df$p.value))
   lv_test_df = lv_test_df %>% arrange(p.value) %>% mutate(sig = case_when(p.value < 0.05 & p.value >= 0.01 ~ "*",
                                                      p.value < 0.01 & p.value >= 0.001 ~ "**",
@@ -330,14 +330,14 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   
   ## Bartlett's Test
   bl_test_df = tryCatch({
-    lapply(features, function(y){
+    mclapply(features, function(y){
     lmm_multi = model_gen(type = type, y = y, batch = batch, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
     fit_residuals = resid(lmm_multi)
     BLtest = bartlett.test(fit_residuals ~ as.factor(df[[batch]]))
     bl_df = BLtest %>% tidy() %>% dplyr::select(p.value) %>% mutate(feature = y) 
     bl_df = bl_df[c(2,1)]
     return(bl_df)
-  }, mc.cores = detectCores()) %>% bind_rows()}, error = function(e) {
+  }, mc.cores = 1) %>% bind_rows()}, error = function(e) {
     cat("Less than 2 observations in each group")
     bl_test_df = data.frame("feature" = NULL, "p.value" = NULL, "sig" = NULL)
     return(bl_test_df)})
@@ -396,7 +396,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
         batch_name = rownames(gamma_hat)
         eb_list = list(gamma_hat, delta_hat, gamma_prior, delta_prior)
         eb_name = c("gamma_hat", "delta_hat", "gamma_prior", "delta_prior")
-        eb_df = lapply(1:4, function(i){
+        eb_df = mclapply(1:4, function(i){
           eb_df_long = data.frame(eb_list[[i]]) %>% mutate(batch = as.factor(batch_name), .before = 1) %>% tidyr::pivot_longer(2:(dim(eb_list[[i]])[2]+1), names_to = "features", values_to = "eb_values") %>% mutate(type = eb_name[i]) 
           return(eb_df_long)
         }) %>% bind_rows()
@@ -421,7 +421,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
         batch_name = rownames(gamma_hat)
         eb_list = list(gamma_hat, delta_hat, gamma_prior, delta_prior, score_gamma_hat, score_delta_hat, score_gamma_prior, score_delta_prior)
         eb_name = c("gamma_hat", "delta_hat", "gamma_prior", "delta_prior", "score_gamma_hat", "score_delta_hat", "score_gamma_prior", "score_delta_prior")
-        eb_df = lapply(1:8, function(i){
+        eb_df = mclapply(1:8, function(i){
           eb_df_long = data.frame(eb_list[[i]]) %>% mutate(batch = as.factor(batch_name), .before = 1) %>% tidyr::pivot_longer(2:(dim(eb_list[[i]])[2]+1), names_to = "features", values_to = "eb_values") %>% mutate(type = eb_name[i]) 
           return(eb_df_long)
         }) %>% bind_rows()
@@ -435,7 +435,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
       batch_name = rownames(gamma_hat)
       eb_list = list(gamma_hat, delta_hat, gamma_prior, delta_prior)
       eb_name = c("gamma_hat", "delta_hat", "gamma_prior", "delta_prior")
-      eb_df = lapply(1:4, function(i){
+      eb_df = mclapply(1:4, function(i){
         eb_df_long = data.frame(eb_list[[i]]) %>% mutate(batch = as.factor(batch_name), .before = 1) %>% tidyr::pivot_longer(2:(dim(eb_list[[i]])[2]+1), names_to = "features", values_to = "eb_values") %>% mutate(type = eb_name[i]) 
         return(eb_df_long)
       }) %>% bind_rows()
@@ -443,8 +443,8 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
     }
   }else{
     reference[[batch]] = as.factor(reference[[batch]])
-    reference[char_var] =  lapply(reference[char_var], as.factor)
-    reference[enco_var] =  lapply(reference[enco_var], as.factor)
+    reference[char_var] =  mclapply(reference[char_var], as.factor)
+    reference[enco_var] =  mclapply(reference[enco_var], as.factor)
     if(!is.null(random)){
       for (r in random){
         reference[[r]] = as.factor(reference[[r]])
@@ -485,7 +485,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
       batch_name = rownames(gamma_hat)
       eb_list = list(gamma_hat, delta_hat, gamma_prior, delta_prior)
       eb_name = c("gamma_hat", "delta_hat", "gamma_prior", "delta_prior")
-      eb_df = lapply(1:4, function(i){
+      eb_df = mclapply(1:4, function(i){
         eb_df_long = data.frame(eb_list[[i]]) %>% mutate(batch = as.factor(batch_name), .before = 1) %>% tidyr::pivot_longer(2:(dim(eb_list[[i]])[2]+1), names_to = "features", values_to = "eb_values") %>% mutate(type = eb_name[i]) 
         return(eb_df_long)
       }) %>% bind_rows()
@@ -510,7 +510,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
       batch_name = rownames(gamma_hat)
       eb_list = list(gamma_hat, delta_hat, gamma_prior, delta_prior, score_gamma_hat, score_delta_hat, score_gamma_prior, score_delta_prior)
       eb_name = c("gamma_hat", "delta_hat", "gamma_prior", "delta_prior", "score_gamma_hat", "score_delta_hat", "score_gamma_prior", "score_delta_prior")
-      eb_df = lapply(1:8, function(i){
+      eb_df = mclapply(1:8, function(i){
         eb_df_long = data.frame(eb_list[[i]]) %>% mutate(batch = as.factor(batch_name), .before = 1) %>% tidyr::pivot_longer(2:(dim(eb_list[[i]])[2]+1), names_to = "features", values_to = "eb_values") %>% mutate(type = eb_name[i]) 
         return(eb_df_long)
       }) %>% bind_rows()
