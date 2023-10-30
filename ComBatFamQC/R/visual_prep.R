@@ -150,7 +150,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
  
    # Residual Plots
   vis_df = df[colnames(df)[!colnames(df) %in% features]]
-  residual_add_df = mclapply(features, function(y){
+  residual_add_df = lapply(features, function(y){
     model = model_gen(y = y, type = type, batch = batch, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
     if(type == "lmer"){
       coef_list = coef(model)
@@ -188,7 +188,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   }, mc.cores = detectCores()) %>% bind_cols()
   residual_add_df = cbind(vis_df, residual_add_df)
   
-  residual_ml_df = mclapply(features, function(y){
+  residual_ml_df = lapply(features, function(y){
     model = model_gen(type = type, y = y, batch = batch, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
     residual = data.frame(resid(model))
     colnames(residual) = y
@@ -208,7 +208,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   
   ## Kenward-Roger(KR) Test
   if(type == "lmer"){
-    kr_test_df = mclapply(features, function(y){
+    kr_test_df = lapply(features, function(y){
       lmm1 = model_gen(type = type, y = y, batch = batch, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
       lmm2 = update(lmm1, as.formula(paste0(".~. -", batch)))
       kr.test = KRmodcomp(lmm1, lmm2)
@@ -232,7 +232,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   }
   
   ## Fligner-Killeen(FK) Test
-  fk_test_df = mclapply(features, function(y){
+  fk_test_df = lapply(features, function(y){
     lmm_multi = model_gen(type = type, y = y, batch = batch, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
     fit_residuals <- resid(lmm_multi)
     FKtest = fligner.test(fit_residuals ~ df[[batch]])
@@ -267,7 +267,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   
   
   ## ANOVA 
-  anova_test_df = mclapply(features, function(y){
+  anova_test_df = lapply(features, function(y){
     lmm1 = model_gen(type = type, y = y, batch = batch, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
     lmm2 = update(lmm1, as.formula(paste0(".~. - ", batch)))
     if(type == "gam"){
@@ -293,7 +293,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   unique_anova = unique(anova_test_df$p.value)[unique(anova_test_df$p.value) != "<0.001"][which(as.numeric(unique(anova_test_df$p.value)[unique(anova_test_df$p.value) != "<0.001"]) < 0.05)]
   
   ## Kruskal-Wallis 
-  kw_test_df = mclapply(features, function(y){
+  kw_test_df = lapply(features, function(y){
     KWtest = kruskal.test(residual_add_df[[y]] ~ residual_add_df[[batch]])
     kw_df = KWtest %>% tidy() %>% dplyr::select(p.value) %>% mutate(feature = y) 
     kw_df = kw_df[c(2,1)]
@@ -310,7 +310,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   unique_kw = unique(kw_test_df$p.value)[unique(kw_test_df$p.value) != "<0.001"][which(as.numeric(unique(kw_test_df$p.value)[unique(kw_test_df$p.value) != "<0.001"]) < 0.05)]
   
   ## Levene's Test
-  lv_test_df = mclapply(features, function(y){
+  lv_test_df = lapply(features, function(y){
     lmm_multi = model_gen(type = type, y = y, batch = batch, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
     fit_residuals = resid(lmm_multi)
     LVtest = leveneTest(fit_residuals ~ as.factor(df[[batch]]))
@@ -330,7 +330,7 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   
   ## Bartlett's Test
   bl_test_df = tryCatch({
-    mclapply(features, function(y){
+    lapply(features, function(y){
     lmm_multi = model_gen(type = type, y = y, batch = batch, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
     fit_residuals = resid(lmm_multi)
     BLtest = bartlett.test(fit_residuals ~ as.factor(df[[batch]]))
