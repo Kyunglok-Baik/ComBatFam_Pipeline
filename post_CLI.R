@@ -66,7 +66,7 @@ if(argv$type == "age_trend"){
   age_list = mclapply(1:length(features), function(w){
     age_sub = age_list_gen (sub_df = eval(parse(text = paste0("sub_df_",w))),  lq = as.numeric(argv$lowerquantile), hq = as.numeric(argv$upperquantile), mu = argv$mu, sigma = argv$sigma, nu = argv$nu, tau = argv$tau)
     return(age_sub)
-  }, mc.cores = detectCores()) 
+  }, mc.cores = 1) 
   names(age_list) = features
   
   quantile_type = c(paste0("quantile_", 100*as.numeric(argv$lowerquantile)), "median", paste0("quantile_", 100*as.numeric(argv$upperquantile)))
