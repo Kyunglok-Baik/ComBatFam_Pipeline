@@ -96,7 +96,7 @@ residual_gen <- function(type, features, covariates, interaction = NULL, random 
     models = mclapply(features, function(y){
       model = model_gen(y = y, type = type, batch = NULL, covariates = covariates, interaction = interaction, random = random, smooth = smooth, df = df)
       return(model)
-    }, mc.cores = detectCores())
+    }, mc.cores = 1)
   }else{
     models = readRDS(model_path)
   }
@@ -114,7 +114,7 @@ residual_gen <- function(type, features, covariates, interaction = NULL, random 
         predict_y = model.matrix(models[[i]])[, which(grepl(paste0(names(rm_coef), collapse = "|"), colnames(model.matrix(models[[i]]))))] %*% t(t(unname(rm_coef)))
         residual_y = df[[features[i]]] - predict_y
         residual_y = data.frame(residual_y)
-      }, mc.cores = detectCores()) %>% bind_cols()
+      }, mc.cores = 1) %>% bind_cols()
     }else{
       df[[random]] = as.factor(df[[random]])
       residuals = mclapply(1:length(features), function(i){
@@ -136,7 +136,7 @@ residual_gen <- function(type, features, covariates, interaction = NULL, random 
         predict_y = model.matrix(models[[i]])[, which(grepl(paste0(names(rm_coef), collapse = "|"), colnames(model.matrix(models[[i]]))))] %*% t(rm_coef)
         residual_y = df[[features[i]]] - predict_y
         residual_y = data.frame(residual_y)
-      }, mc.cores = detectCores()) %>% bind_cols()
+      }, mc.cores = 1) %>% bind_cols()
     }
     colnames(residuals) = features
     residuals = cbind(other_info, residuals)
