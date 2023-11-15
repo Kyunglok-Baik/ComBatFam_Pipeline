@@ -38,7 +38,7 @@ This step will display the available commands and options for both pipelines.
 ```{r}
 library(devtools)
 
-devtools::install_github("Zheng206/ComBatFam_Pipeline/ComBatFamily")
+devtools::install_github("Kyunglok-Baik/ComBatFam_Pipeline/ComBatFamily")
 
 ```
 
@@ -47,5 +47,5 @@ devtools::install_github("Zheng206/ComBatFam_Pipeline/ComBatFamily")
 ```{r}
 library(devtools)
 
-devtools::install_github("Zheng206/ComBatFam_Pipeline/ComBatFamQC")
+devtools::install_github("Kyunglok-Baik/ComBatFam_Pipeline/ComBatFamQC")
 ```
