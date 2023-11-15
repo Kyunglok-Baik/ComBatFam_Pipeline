@@ -82,8 +82,8 @@ visual_prep <- function(type, features, batch, covariates, interaction = NULL, r
   df[[batch]] = as.factor(df[[batch]])
   char_var = covariates[sapply(df[covariates], function(col) is.character(col) || is.factor(col))]
   enco_var = covariates[sapply(df[covariates], function(col) length(unique(col)) == 2 && all(unique(col) %in% c(0,1)))]
-  df[char_var] =  mclapply(df[char_var], as.factor)
-  df[enco_var] =  mclapply(df[enco_var], as.factor)
+  df[char_var] =  mclapply(df[char_var], as.factor, mc.cores=1)
+  df[enco_var] =  mclapply(df[enco_var], as.factor, mc.cores=1)
   cov_shiny = covariates
   char_var = c(char_var, enco_var)
   if(!is.null(random)){
